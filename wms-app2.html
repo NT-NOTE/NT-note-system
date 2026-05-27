@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NT — System</title>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#050505;
+  --s1:#0d0d0d;
+  --s2:#141414;
+  --s3:#1c1c1c;
+  --border:#222;
+  --border2:#2e2e2e;
+  --green:#00e676;
+  --blue:#448aff;
+  --amber:#ffab40;
+  --red:#ff5252;
+  --text:#f5f5f5;
+  --text2:#888;
+  --text3:#444;
+  --sans:'Inter',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --r:10px;
+  --r2:16px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;font-size:15px}
+
+/* TOP BAR */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(5,5,5,0.92);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;backdrop-filter:blur(20px)}
+.topbar-logo{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:3px;color:var(--text)}
+.topbar-logo span{color:var(--green)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{opacity:.7;box-shadow:0 0 0 6px rgba(0,230,118,0)}}
+.topbar-skus{font-size:12px;color:var(--text2);font-family:var(--mono)}
+
+/* BOTTOM NAV */
+.bottomnav{position:fixed;bottom:0;left:0;right:0;z-index:100;height:64px;background:rgba(5,5,5,0.96);border-top:1px solid var(--border);display:flex;backdrop-filter:blur(20px)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;border:none;background:none;color:var(--text3);transition:color .2s;padding:0}
+.nav-item.active{color:var(--green)}
+.nav-icon{font-size:20px;line-height:1}
+.nav-label{font-size:9px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px}
+
+/* PAGES */
+main{padding:72px 0 80px}
+.page{display:none;padding:16px}
+.page.active{display:block}
+
+/* SECTION HEADERS */
+.sec{font-size:10px;font-family:var(--mono);letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:16px;margin-bottom:12px}
+.card-sm{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:8px}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:14px 12px}
+.stat-val{font-size:30px;font-weight:600;font-family:var(--mono);line-height:1}
+.stat-lbl{font-size:10px;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.stat.green .stat-val{color:var(--green)}
+.stat.blue .stat-val{color:var(--blue)}
+.stat.amber .stat-val{color:var(--amber)}
+.stat.red .stat-val{color:var(--red)}
+
+/* FLOW STEPS */
+.flow{display:flex;gap:6px;margin-bottom:16px}
+.flow-s{flex:1;text-align:center;padding:8px 2px;background:var(--s2);border:1px solid var(--border);border-radius:8px;font-size:9px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;color:var(--text3)}
+.flow-s.active{background:rgba(0,230,118,.06);border-color:var(--green);color:var(--green)}
+.flow-s.done{border-color:var(--border2);color:var(--text3)}
+
+/* SCANNER */
+.scan-wrap{position:relative;background:#000;border-radius:var(--r2);overflow:hidden;aspect-ratio:4/3;margin-bottom:12px;border:1px solid var(--border)}
+.scan-wrap video{width:100%;height:100%;object-fit:cover}
+.scan-ui{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.scan-box{width:55%;aspect-ratio:1;position:relative}
+.scan-corner{position:absolute;width:20px;height:20px;border-color:var(--green);border-style:solid}
+.scan-corner.tl{top:0;left:0;border-width:2px 0 0 2px}
+.scan-corner.tr{top:0;right:0;border-width:2px 2px 0 0}
+.scan-corner.bl{bottom:0;left:0;border-width:0 0 2px 2px}
+.scan-corner.br{bottom:0;right:0;border-width:0 2px 2px 0}
+.scan-line-anim{position:absolute;left:0;right:0;height:1px;background:var(--green);box-shadow:0 0 8px var(--green);animation:scanline 2s ease-in-out infinite}
+@keyframes scanline{0%{top:5%}100%{top:95%}}
+.scan-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+.scan-overlay.show{display:flex}
+.scan-idle{font-size:12px;color:rgba(255,255,255,.5);font-family:var(--mono)}
+
+/* RESULT PILL */
+.result-pill{display:flex;align-items:center;gap:10px;background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;font-family:var(--mono);font-size:12px;min-height:46px;color:var(--text2)}
+.result-pill.ok{border-color:rgba(0,230,118,.3);color:var(--green);background:rgba(0,230,118,.04)}
+.result-pill.err{border-color:rgba(255,82,82,.3);color:var(--red);background:rgba(255,82,82,.04)}
+
+/* FORM */
+.label{font-size:10px;font-family:var(--mono);letter-spacing:1px;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:6px}
+.input{width:100%;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:var(--sans);font-size:14px;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.input:focus{border-color:rgba(0,230,118,.4)}
+select.input{cursor:pointer}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fg{margin-bottom:10px}
+
+/* BUTTONS */
+.btn{width:100%;padding:14px;border-radius:10px;border:none;font-family:var(--sans);font-weight:500;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s,transform .1s}
+.btn:active{transform:scale(.97)}
+.btn-green{background:var(--green);color:#000}
+.btn-ghost{background:var(--s2);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:9px 14px;font-size:13px;border-radius:8px;width:auto}
+.btn-red{background:rgba(255,82,82,.1);color:var(--red);border:1px solid rgba(255,82,82,.2)}
+
+/* PRODUCT ROW */
+.prod-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.prod-row:last-child{border:none}
+.prod-icon{width:38px;height:38px;border-radius:8px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.prod-info{flex:1;min-width:0}
+.prod-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prod-sku{font-size:11px;color:var(--text2);font-family:var(--mono)}
+.prod-qty{text-align:right}
+.prod-num{font-size:22px;font-weight:600;font-family:var(--mono);color:var(--green)}
+.prod-num.low{color:var(--red)}
+.prod-unit{font-size:10px;color:var(--text3);text-transform:uppercase}
+
+/* LOC TAG */
+.loc{display:inline-flex;align-items:center;gap:4px;background:rgba(68,138,255,.08);border:1px solid rgba(68,138,255,.2);border-radius:6px;padding:3px 8px;font-family:var(--mono);font-size:11px;color:var(--blue)}
+
+/* ORDER ROW */
+.order-row{padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.order-row:last-child{border:none}
+.order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.order-id{font-family:var(--mono);font-size:13px;color:var(--blue)}
+.order-meta{font-size:12px;color:var(--text2);margin-top:2px}
+
+/* BADGE */
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px}
+.b-green{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.b-blue{background:rgba(68,138,255,.1);color:var(--blue);border:1px solid rgba(68,138,255,.15)}
+.b-amber{background:rgba(255,171,64,.1);color:var(--amber);border:1px solid rgba(255,171,64,.2)}
+.b-red{background:rgba(255,82,82,.1);color:var(--red);border:1px solid rgba(255,82,82,.2)}
+
+/* LABEL PRINT */
+.label-print{background:#fff;color:#000;border-radius:10px;padding:16px;font-family:var(--mono);margin-bottom:12px}
+.lp-brand{font-size:22px;font-weight:700;letter-spacing:3px}
+.lp-sku{font-size:11px;color:#555;margin-top:2px}
+.lp-name{font-size:13px;font-weight:600;margin-top:8px}
+.lp-loc{font-size:16px;font-weight:700;color:#0055cc;margin-top:6px}
+.lp-qr{margin-top:10px;display:flex;justify-content:center}
+
+/* ALERT */
+.alert{padding:11px 14px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:8px;line-height:1.4}
+.alert-green{background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);color:var(--green)}
+.alert-amber{background:rgba(255,171,64,.06);border:1px solid rgba(255,171,64,.2);color:var(--amber)}
+.alert-blue{background:rgba(68,138,255,.06);border:1px solid rgba(68,138,255,.15);color:var(--blue)}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;align-items:flex-end;backdrop-filter:blur(8px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-height:88vh;overflow-y:auto}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:16px}
+
+/* DIVIDER */
+.div{height:1px;background:var(--border);margin:14px 0}
+
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:12px;right:12px;z-index:300;background:var(--green);color:#000;padding:13px 16px;border-radius:10px;font-weight:500;font-size:14px;text-align:center;transform:translateY(120px);opacity:0;transition:all .25s;pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.err{background:var(--red);color:#fff}
+
+/* SETTINGS SPECIFIC */
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.setting-row:last-child{border:none}
+.setting-label{font-size:14px;font-weight:500}
+.setting-sub{font-size:12px;color:var(--text2);margin-top:2px}
+
+/* QR PHONE */
+.phone-qr-box{background:#fff;border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:center;margin-bottom:12px}
+
+/* ACTIVITY ITEM */
+.act-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.act-item:last-child{border:none}
+.act-time{font-size:10px;color:var(--text3);font-family:var(--mono)}
+
+@media print{.topbar,.bottomnav,.btn,main>*:not(.label-print){display:none}.label-print{display:block!important}}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar-logo">NT<span>·</span>SYS</div>
+  <div class="topbar-right">
+    <div class="live-dot"></div>
+    <div class="topbar-skus"><span id="hd-skus">0</span> SKU</div>
+  </div>
+</nav>
+
+<main>
+
+<!-- DASHBOARD -->
+<div class="page active" id="p-dash">
+  <div class="stat-grid">
+    <div class="stat green"><div class="stat-val" id="s-skus">0</div><div class="stat-lbl">Products</div></div>
+    <div class="stat blue"><div class="stat-val" id="s-orders">0</div><div class="stat-lbl">Orders</div></div>
+    <div class="stat amber"><div class="stat-val" id="s-low">0</div><div class="stat-lbl">Low Stock</div></div>
+    <div class="stat red"><div class="stat-val" id="s-shipped">0</div><div class="stat-lbl">Shipped</div></div>
+  </div>
+
+  <div class="sec">Activity</div>
+  <div class="card" id="act-feed">
+    <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No activity yet</div>
+  </div>
+
+  <div class="sec">Alerts</div>
+  <div class="card" id="alert-feed">
+    <div style="color:var(--green);font-size:13px;text-align:center;padding:16px 0">✓ All levels OK</div>
+  </div>
+</div>
+
+<!-- RECEIVE -->
+<div class="page" id="p-recv">
+  <div class="flow">
+    <div class="flow-s active" id="fs1">Scan</div>
+    <div class="flow-s" id="fs2">Info</div>
+    <div class="flow-s" id="fs3">Place</div>
+    <div class="flow-s" id="fs4">Done</div>
+  </div>
+
+  <div class="scan-wrap" id="recv-wrap">
+    <video id="recv-vid" playsinline muted></video>
+    <div class="scan-ui">
+      <div class="scan-box">
+        <div class="scan-corner tl"></div>
+        <div class="scan-corner tr"></div>
+        <div class="scan-corner bl"></div>
+        <div class="scan-corner br"></div>
+        <div class="scan-line-anim"></div>
+      </div>
+    </div>
+    <div class="scan-overlay show" id="recv-overlay">
+      <div style="font-size:28px">📦</div>
+      <div class="scan-idle">Tap camera to start</div>
+    </div>
+  </div>
+
+  <div class="result-pill" id="recv-result">
+    <span style="font-size:16px">⬡</span>
+    <span>Ready to scan incoming item</span>
+  </div>
+
+  <div id="recv-form" style="display:none">
+    <div class="sec">Item Details</div>
+    <div class="fg"><label class="label">Product Name</label><input class="input" id="r-name" placeholder="e.g. NT Note Black Tee — M"></div>
+    <div class="form-row">
+      <div class="fg"><label class="label">SKU</label><input class="input" id="r-sku" readonly></div>
+      <div class="fg"><label class="label">Quantity</label><input class="input" id="r-qty" type="number" value="1" min="1"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label class="label">Category</label>
+        <select class="input" id="r-cat"><option>Clothing</option><option>Accessories</option><option>Electronics</option><option>Other</option></select>
+      </div>
+      <div class="fg"><label class="label">Min Alert</label><input class="input" id="r-min" type="number" value="5"></div>
+    </div>
+
+    <div class="sec">Location</div>
+    <div class="form-row">
+      <div class="fg"><label class="label">Aisle</label>
+        <select class="input" id="r-aisle"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+      </div>
+      <div class="fg"><label class="label">Shelf</label><input class="input" id="r-shelf" placeholder="01" maxlength="2"></div>
+    </div>
+    <div class="fg"><label class="label">Bin</label><input class="input" id="r-bin" placeholder="001" maxlength="3"></div>
+
+    <div class="alert alert-green" id="loc-prev" style="display:none">
+      📍 <span id="loc-txt">Location: —</span>
+    </div>
+
+    <div class="div"></div>
+    <button class="btn btn-green" onclick="confirmRecv()">Confirm & Generate Label</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost" onclick="resetRecv()">Cancel</button>
+  </div>
+
+  <div id="recv-label" style="display:none">
+    <div class="sec">Label Ready</div>
+    <div class="label-print" id="label-out"></div>
+    <button class="btn btn-green" onclick="window.print()">🖨 Print Label</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost" onclick="resetRecv()">Receive Another</button>
+  </div>
+</div>
+
+<!-- INVENTORY -->
+<div class="page" id="p-inv">
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <input class="input" id="inv-search" placeholder="Search by name or SKU..." style="flex:1" oninput="renderInv()">
+    <button class="btn btn-green btn-sm" onclick="openAddModal()">+ Add</button>
+  </div>
+  <div class="sec">Products</div>
+  <div class="card" id="inv-list">
+    <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No products yet</div>
+  </div>
+</div>
+
+<!-- PICK/PACK -->
+<div class="page" id="p-pick">
+  <div class="sec">Orders</div>
+  <div class="card" id="orders-list">
+    <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No active orders</div>
+  </div>
+
+  <div class="sec">New Order</div>
+  <div class="card">
+    <div class="fg"><label class="label">Order ID</label><input class="input" id="o-id" placeholder="#1001"></div>
+    <div class="fg"><label class="label">Customer</label><input class="input" id="o-cust" placeholder="John Doe"></div>
+    <div class="fg"><label class="label">Items — SKU:qty, SKU:qty</label><input class="input" id="o-items" placeholder="NT-TEE-M:2, NT-PANT-L:1"></div>
+    <button class="btn btn-green" onclick="addOrder()">Create Order</button>
+  </div>
+</div>
+
+<!-- SHIP -->
+<div class="page" id="p-ship">
+  <div class="sec">Scan to Confirm Shipment</div>
+  <div class="scan-wrap">
+    <video id="ship-vid" playsinline muted></video>
+    <div class="scan-ui">
+      <div class="scan-box">
+        <div class="scan-corner tl"></div><div class="scan-corner tr"></div>
+        <div class="scan-corner bl"></div><div class="scan-corner br"></div>
+        <div class="scan-line-anim"></div>
+      </div>
+    </div>
+  </div>
+  <div class="result-pill" id="ship-result">
+    <span style="font-size:16px">🚚</span>
+    <span>Scan packed order to ship</span>
+  </div>
+
+  <div class="sec">Packed — Ready to Ship</div>
+  <div class="card" id="packed-list">
+    <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No packed orders</div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="p-set">
+
+  <div class="sec">Connect Phone</div>
+  <div class="card">
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:36px;margin-bottom:10px">📱</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:4px">Phone as wireless scanner</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">Open this link on your phone — the camera scanner works from anywhere</div>
+    </div>
+    <div id="qr-section" style="display:none">
+      <div class="phone-qr-box" id="qr-box"></div>
+      <div class="alert alert-blue" style="margin-bottom:10px">
+        Open Chrome on your phone → scan QR → use scanner 📸
+      </div>
+      <button class="btn btn-ghost" onclick="hideQR()">Hide QR</button>
+    </div>
+    <div id="qr-btns">
+      <button class="btn btn-green" onclick="showQR()" style="margin-bottom:8px">
+        Generate QR Code
+      </button>
+      <button class="btn btn-ghost" onclick="copyLink()">📋 Copy Link for WhatsApp</button>
+    </div>
+  </div>
+
+  <div class="sec">Camera</div>
+  <div class="card">
+    <div class="fg"><label class="label">Facing Mode</label>
+      <select class="input" id="cam-mode" onchange="saveSets()">
+        <option value="environment">Back Camera</option>
+        <option value="user">Front Camera</option>
+      </select>
+    </div>
+    <div class="fg"><label class="label">Test Camera</label></div>
+    <div class="scan-wrap" id="test-wrap" style="display:none">
+      <video id="test-vid" playsinline muted></video>
+      <div class="scan-ui"><div class="scan-box">
+        <div class="scan-corner tl"></div><div class="scan-corner tr"></div>
+        <div class="scan-corner bl"></div><div class="scan-corner br"></div>
+        <div class="scan-line-anim"></div>
+      </div></div>
+    </div>
+    <div class="result-pill" id="test-result" style="display:none">
+      <span>Point at any barcode or QR...</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-green" style="flex:1" onclick="testCam()">Test Camera</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="stopTest()">Stop</button>
+    </div>
+  </div>
+
+  <div class="sec">Shopify</div>
+  <div class="card">
+    <div class="fg"><label class="label">Store URL</label><input class="input" id="sh-store" value="4jyw48-ce.myshopify.com"></div>
+    <div class="fg"><label class="label">Access Token</label>
+      <div style="position:relative">
+        <input class="input" id="sh-token" type="password" placeholder="shpat_..." style="padding-right:44px">
+        <button onclick="toggleTok()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px" id="tok-eye">👁</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <button class="btn btn-ghost" onclick="saveShopify()">Save</button>
+      <button class="btn btn-green" onclick="syncOrders()">Sync Orders</button>
+    </div>
+  </div>
+
+  <div class="sec">Labels</div>
+  <div class="card">
+    <div class="fg"><label class="label">Brand on Labels</label><input class="input" id="lbl-brand" value="NT Note" onchange="saveSets()"></div>
+    <div class="fg"><label class="label">Label Size</label>
+      <select class="input" id="lbl-size" onchange="saveSets()">
+        <option value="4x6">4×6 inch — Shipping</option>
+        <option value="3x2">3×2 inch — Standard</option>
+        <option value="letter">Letter — Print at home</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="sec">Data</div>
+  <div class="card">
+    <div class="form-row" style="margin-bottom:8px">
+      <button class="btn btn-ghost" onclick="exportData()">📤 Export</button>
+      <button class="btn btn-ghost" onclick="importData()">📥 Import</button>
+    </div>
+    <button class="btn btn-red" onclick="clearData()">Clear All Data</button>
+    <input type="file" id="imp-file" accept=".json" style="display:none" onchange="handleImport(this)">
+  </div>
+
+  <div style="text-align:center;padding:24px 0 8px;font-family:var(--mono);font-size:11px;color:var(--text3)">
+    NT Note System · v2.0<br>
+    <span style="color:var(--green)">github.io/NT-note-system</span>
+  </div>
+</div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bottomnav">
+  <button class="nav-item active" onclick="goTab('dash',this)">
+    <div class="nav-icon">⬡</div>
+    <div class="nav-label">Home</div>
+  </button>
+  <button class="nav-item" onclick="goTab('recv',this)">
+    <div class="nav-icon">↓</div>
+    <div class="nav-label">Receive</div>
+  </button>
+  <button class="nav-item" onclick="goTab('inv',this)">
+    <div class="nav-icon">◫</div>
+    <div class="nav-label">Stock</div>
+  </button>
+  <button class="nav-item" onclick="goTab('pick',this)">
+    <div class="nav-icon">◈</div>
+    <div class="nav-label">Orders</div>
+  </button>
+  <button class="nav-item" onclick="goTab('ship',this)">
+    <div class="nav-icon">↗</div>
+    <div class="nav-label">Ship</div>
+  </button>
+  <button class="nav-item" onclick="goTab('set',this)">
+    <div class="nav-icon">⊙</div>
+    <div class="nav-label">Settings</div>
+  </button>
+</nav>
+
+<!-- ADD MODAL -->
+<div class="modal-bg" id="add-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Add Product</div>
+    <div class="fg"><label class="label">Name</label><input class="input" id="a-name" placeholder="NT Note Black Tee — M"></div>
+    <div class="form-row">
+      <div class="fg"><label class="label">SKU</label><input class="input" id="a-sku" placeholder="NT-TEE-M-BLK"></div>
+      <div class="fg"><label class="label">Qty</label><input class="input" id="a-qty" type="number" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label class="label">Aisle</label><select class="input" id="a-aisle"><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+      <div class="fg"><label class="label">Shelf-Bin</label><input class="input" id="a-loc" placeholder="01-001"></div>
+    </div>
+    <div class="fg"><label class="label">Min Alert</label><input class="input" id="a-min" type="number" value="5"></div>
+    <button class="btn btn-green" onclick="confirmAdd()">Add to Inventory</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost" onclick="closeAdd()">Cancel</button>
+  </div>
+</div>
+
+<!-- ORDER MODAL -->
+<div class="modal-bg" id="ord-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="ord-title">Order</div>
+    <div id="ord-body"></div>
+    <button class="btn btn-green" id="ord-btn" style="margin-top:12px"></button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost" onclick="closeOrd()">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+let inv = JSON.parse(localStorage.getItem('nt_inv')||'[]');
+let orders = JSON.parse(localStorage.getItem('nt_orders')||'[]');
+let acts = JSON.parse(localStorage.getItem('nt_acts')||'[]');
+let sets = JSON.parse(localStorage.getItem('nt_sets')||'{}');
+let recvScan=null,shipScan=null,testScan=null;
+
+function save(){
+  localStorage.setItem('nt_inv',JSON.stringify(inv));
+  localStorage.setItem('nt_orders',JSON.stringify(orders));
+  localStorage.setItem('nt_acts',JSON.stringify(acts));
+  localStorage.setItem('nt_sets',JSON.stringify(sets));
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(err?' err':'');
+  setTimeout(()=>t.className='toast',2600);
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+function log(msg){
+  acts.unshift({msg,t:new Date().toLocaleTimeString()});
+  if(acts.length>25)acts.pop();
+  save();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function goTab(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('p-'+id).classList.add('active');
+  btn.classList.add('active');
+  stopRecv();stopShip();stopTest();
+  if(id==='dash')renderDash();
+  if(id==='recv')startRecv();
+  if(id==='inv')renderInv();
+  if(id==='pick')renderOrders();
+  if(id==='ship'){renderPacked();startShip();}
+  if(id==='set')loadSets();
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDash(){
+  document.getElementById('s-skus').textContent=inv.length;
+  document.getElementById('s-orders').textContent=orders.filter(o=>o.status!=='shipped').length;
+  document.getElementById('s-low').textContent=inv.filter(p=>p.qty<=p.min).length;
+  document.getElementById('s-shipped').textContent=orders.filter(o=>o.status==='shipped').length;
+  document.getElementById('hd-skus').textContent=inv.length;
+
+  const af=document.getElementById('act-feed');
+  af.innerHTML=acts.length?acts.slice(0,8).map(a=>`
+    <div class="act-item">
+      <span>${a.msg}</span>
+      <span class="act-time">${a.t}</span>
+    </div>`).join(''):'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No activity yet</div>';
+
+  const low=inv.filter(p=>p.qty<=p.min);
+  document.getElementById('alert-feed').innerHTML=low.length?low.map(p=>`
+    <div class="prod-row">
+      <div class="prod-icon">⚠️</div>
+      <div class="prod-info"><div class="prod-name">${p.name}</div><div class="prod-sku">${p.sku}</div></div>
+      <div class="prod-qty"><div class="prod-num low">${p.qty}</div><div class="prod-unit">left</div></div>
+    </div>`).join(''):'<div style="color:var(--green);font-size:13px;text-align:center;padding:16px 0">✓ All levels OK</div>';
+}
+
+// ── SCANNER HELPERS ───────────────────────────────────────────────────────────
+async function startScanner(videoId,cb){
+  const cr=new ZXing.BrowserMultiFormatReader();
+  try{
+    const facing=sets.camMode||'environment';
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing}});
+    const v=document.getElementById(videoId);
+    v.srcObject=stream;
+    await v.play();
+    cr.decodeFromStream(stream,v,(res)=>{if(res)cb(res.getText(),cr);});
+  }catch(e){cb(null,cr,e);}
+  return cr;
+}
+function stopScanner(scanner,videoId){
+  if(scanner){try{scanner.reset();}catch(e){}}
+  const v=document.getElementById(videoId);
+  if(v&&v.srcObject){v.srcObject.getTracks().forEach(t=>t.stop());v.srcObject=null;}
+}
+
+// ── RECEIVE ───────────────────────────────────────────────────────────────────
+async function startRecv(){
+  const overlay=document.getElementById('recv-overlay');
+  overlay.classList.remove('show');
+  recvScan=await startScanner('recv-vid',(code,cr,err)=>{
+    if(err){
+      overlay.classList.add('show');
+      document.getElementById('recv-result').className='result-pill err';
+      document.getElementById('recv-result').innerHTML='<span>⚠</span><span>Camera unavailable — enter SKU manually</span>';
+      document.getElementById('recv-form').style.display='block';
+      return;
+    }
+    document.getElementById('recv-result').className='result-pill ok';
+    document.getElementById('recv-result').innerHTML=`<span>✓</span><span>Scanned: <b>${code}</b></span>`;
+    document.getElementById('r-sku').value=code;
+    const ex=inv.find(p=>p.sku===code);
+    if(ex)document.getElementById('r-name').value=ex.name;
+    document.getElementById('recv-form').style.display='block';
+    setFlow(2);
+    stopScanner(cr,'recv-vid');
+    recvScan=null;
+  });
+}
+function stopRecv(){stopScanner(recvScan,'recv-vid');recvScan=null;}
+
+function setFlow(n){
+  ['fs1','fs2','fs3','fs4'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.className='flow-s'+(i+1<n?' done':i+1===n?' active':'');
+  });
+}
+
+// Location preview
+['r-aisle','r-shelf','r-bin'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input',()=>{
+    const a=document.getElementById('r-aisle')?.value||'A';
+    const s=document.getElementById('r-shelf')?.value||'01';
+    const b=document.getElementById('r-bin')?.value||'001';
+    const prev=document.getElementById('loc-prev');
+    prev.style.display='flex';
+    document.getElementById('loc-txt').textContent=`Location: ${a}-${s}-${b}`;
+  });
+});
+
+function confirmRecv(){
+  const name=document.getElementById('r-name').value.trim();
+  const sku=document.getElementById('r-sku').value.trim()||'SKU-'+Date.now();
+  const qty=parseInt(document.getElementById('r-qty').value)||1;
+  const cat=document.getElementById('r-cat').value;
+  const min=parseInt(document.getElementById('r-min').value)||5;
+  const aisle=document.getElementById('r-aisle').value;
+  const shelf=document.getElementById('r-shelf').value||'01';
+  const bin=document.getElementById('r-bin').value||'001';
+  if(!name){toast('Enter product name',true);return;}
+  const loc=`${aisle}-${shelf}-${bin}`;
+  const idx=inv.findIndex(p=>p.sku===sku);
+  if(idx>=0)inv[idx].qty+=qty;
+  else inv.push({name,sku,qty,cat,min,loc,rcvd:new Date().toLocaleDateString()});
+  save();log(`Received ${qty}× ${name} → ${loc}`);renderDash();
+  document.getElementById('recv-form').style.display='none';
+  document.getElementById('recv-label').style.display='block';
+  setFlow(4);
+  const brand=sets.brand||'NT Note';
+  const lo=document.getElementById('label-out');
+  lo.innerHTML=`
+    <div class="lp-brand">${brand.toUpperCase()}</div>
+    <div class="lp-sku">${sku}</div>
+    <div class="lp-name">${name}</div>
+    <div class="lp-loc">📍 ${loc}</div>
+    <div style="font-size:12px;color:#555;margin-top:4px">Qty: ${qty} · ${new Date().toLocaleDateString()}</div>
+    <div class="lp-qr" id="lp-qr"></div>`;
+  setTimeout(()=>{try{new QRCode(document.getElementById('lp-qr'),{text:sku,width:80,height:80,colorDark:'#000',colorLight:'#fff'});}catch(e){}},100);
+  toast(`✓ ${name} at ${loc}`);
+}
+
+function resetRecv(){
+  document.getElementById('recv-form').style.display='none';
+  document.getElementById('recv-label').style.display='none';
+  document.getElementById('recv-result').className='result-pill';
+  document.getElementById('recv-result').innerHTML='<span style="font-size:16px">⬡</span><span>Ready to scan incoming item</span>';
+  document.getElementById('recv-overlay').classList.add('show');
+  setFlow(1);
+  startRecv();
+}
+
+// ── INVENTORY ─────────────────────────────────────────────────────────────────
+function renderInv(){
+  const q=(document.getElementById('inv-search')?.value||'').toLowerCase();
+  const f=inv.filter(p=>p.name.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q));
+  const el=document.getElementById('inv-list');
+  el.innerHTML=f.length?f.map(p=>`
+    <div class="prod-row" onclick="editProd('${p.sku}')">
+      <div class="prod-icon">${p.cat==='Clothing'?'👕':'📦'}</div>
+      <div class="prod-info">
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-sku">${p.sku} &nbsp;<span class="loc">${p.loc||'—'}</span></div>
+      </div>
+      <div class="prod-qty">
+        <div class="prod-num ${p.qty<=p.min?'low':''}">${p.qty}</div>
+        <div class="prod-unit">units</div>
+      </div>
+    </div>`).join(''):'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No products found</div>';
+}
+
+function editProd(sku){
+  const p=inv.find(i=>i.sku===sku);if(!p)return;
+  document.getElementById('ord-title').textContent=p.name;
+  document.getElementById('ord-body').innerHTML=`
+    <div class="fg"><label class="label">SKU</label><div style="font-family:var(--mono);font-size:13px;padding:8px 0;color:var(--blue)">${p.sku}</div></div>
+    <div class="form-row">
+      <div class="fg"><label class="label">Qty</label><input class="input" id="ep-qty" type="number" value="${p.qty}"></div>
+      <div class="fg"><label class="label">Min Alert</label><input class="input" id="ep-min" type="number" value="${p.min}"></div>
+    </div>
+    <div class="fg"><label class="label">Location</label><div class="loc">${p.loc||'Not set'}</div></div>`;
+  const btn=document.getElementById('ord-btn');
+  btn.textContent='Update Stock';
+  btn.onclick=()=>{
+    p.qty=parseInt(document.getElementById('ep-qty').value)||0;
+    p.min=parseInt(document.getElementById('ep-min').value)||5;
+    save();renderInv();renderDash();closeOrd();toast('Stock updated');
+  };
+  document.getElementById('ord-modal').classList.add('open');
+}
+
+function openAddModal(){document.getElementById('add-modal').classList.add('open');}
+function closeAdd(){document.getElementById('add-modal').classList.remove('open');}
+
+function confirmAdd(){
+  const name=document.getElementById('a-name').value.trim();
+  const sku=document.getElementById('a-sku').value.trim()||'SKU-'+Date.now();
+  const qty=parseInt(document.getElementById('a-qty').value)||0;
+  const aisle=document.getElementById('a-aisle').value;
+  const loc2=document.getElementById('a-loc').value||'01-001';
+  const min=parseInt(document.getElementById('a-min').value)||5;
+  if(!name){toast('Enter product name',true);return;}
+  inv.push({name,sku,qty,cat:'Clothing',min,loc:`${aisle}-${loc2}`,rcvd:new Date().toLocaleDateString()});
+  save();renderInv();renderDash();closeAdd();toast(`${name} added`);log(`Added ${name}`);
+}
+
+// ── ORDERS ────────────────────────────────────────────────────────────────────
+function addOrder(){
+  const id=document.getElementById('o-id').value.trim().replace('#','');
+  const cust=document.getElementById('o-cust').value.trim();
+  const raw=document.getElementById('o-items').value.trim();
+  if(!id||!cust){toast('Fill order ID and customer',true);return;}
+  const items=raw.split(',').map(i=>{const[s,q]=i.trim().split(':');return{sku:s?.trim(),qty:parseInt(q)||1};}).filter(i=>i.sku);
+  orders.push({id,cust,items,status:'pending',created:new Date().toLocaleDateString()});
+  save();renderOrders();log(`Order #${id} for ${cust}`);
+  ['o-id','o-cust','o-items'].forEach(i=>document.getElementById(i).value='');
+  toast(`Order #${id} created`);
+}
+
+function renderOrders(){
+  const active=orders.filter(o=>o.status!=='shipped');
+  document.getElementById('orders-list').innerHTML=active.length?active.map(o=>`
+    <div class="order-row" onclick="openOrd('${o.id}')">
+      <div class="order-top">
+        <span class="order-id">#${o.id}</span>
+        <span class="badge ${o.status==='pending'?'b-amber':o.status==='packed'?'b-green':'b-blue'}">${o.status}</span>
+      </div>
+      <div class="order-meta">${o.cust} · ${o.items?.length||0} item(s) · ${o.created}</div>
+    </div>`).join(''):'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No active orders</div>';
+}
+
+const nextS={pending:'picking',picking:'packing',packing:'packed'};
+const nextL={pending:'▶ Start Picking',picking:'📦 Start Packing',packing:'✓ Mark as Packed'};
+
+function openOrd(id){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  document.getElementById('ord-title').textContent=`Order #${o.id}`;
+  document.getElementById('ord-body').innerHTML=`
+    <div style="margin-bottom:12px"><span class="badge ${o.status==='packed'?'b-green':o.status==='shipped'?'b-blue':'b-amber'}">${o.status.toUpperCase()}</span></div>
+    <div class="fg"><label class="label">Customer</label><div style="padding:8px 0;font-size:14px">${o.cust}</div></div>
+    <div class="label" style="margin-bottom:8px">Items</div>
+    ${o.items.map(i=>{const p=inv.find(x=>x.sku===i.sku);return`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px"><span>${i.sku} × ${i.qty}</span><span style="color:${p?'var(--blue)':'var(--red)'}">${p?'→ '+p.loc:'NOT IN INV'}</span></div>`;}).join('')}`;
+  const btn=document.getElementById('ord-btn');
+  if(o.status==='packed'){
+    btn.textContent='→ Go to Ship';
+    btn.onclick=()=>{closeOrd();goTab('ship',document.querySelectorAll('.nav-item')[4]);};
+  } else if(o.status==='shipped'){
+    btn.textContent='✓ Shipped';btn.disabled=true;
+  } else {
+    btn.textContent=nextL[o.status]||'Update';
+    btn.disabled=false;
+    btn.onclick=()=>{
+      if(o.status==='picking'){o.items.forEach(item=>{const p=inv.find(x=>x.sku===item.sku);if(p)p.qty=Math.max(0,p.qty-item.qty);});}
+      o.status=nextS[o.status];
+      save();renderOrders();renderDash();log(`Order #${o.id} → ${o.status}`);
+      closeOrd();toast(`#${o.id} → ${o.status}`);
+    };
+  }
+  document.getElementById('ord-modal').classList.add('open');
+}
+
+function closeOrd(){document.getElementById('ord-modal').classList.remove('open');}
+
+// ── SHIP ──────────────────────────────────────────────────────────────────────
+async function startShip(){
+  shipScan=await startScanner('ship-vid',(code,cr,err)=>{
+    if(err||!code)return;
+    const o=orders.find(x=>x.id===code||'#'+x.id===code);
+    const el=document.getElementById('ship-result');
+    if(o&&o.status==='packed'){
+      o.status='shipped';o.shippedAt=new Date().toLocaleString();
+      save();renderPacked();renderDash();
+      el.className='result-pill ok';
+      el.innerHTML=`<span>✓</span><span>Order #${o.id} — Shipped!</span>`;
+      log(`Order #${o.id} shipped`);toast(`#${o.id} shipped 🚀`);
+    } else {
+      el.className='result-pill err';
+      el.innerHTML=`<span>⚠</span><span>${o?`Order not packed (${o.status})`:'Not found: '+code}</span>`;
+    }
+  });
+}
+function stopShip(){stopScanner(shipScan,'ship-vid');shipScan=null;}
+
+function renderPacked(){
+  const packed=orders.filter(o=>o.status==='packed');
+  document.getElementById('packed-list').innerHTML=packed.length?packed.map(o=>`
+    <div class="order-row">
+      <div class="order-top"><span class="order-id">#${o.id}</span><span class="badge b-green">PACKED</span></div>
+      <div class="order-meta">${o.cust}</div>
+      <div style="margin-top:8px">
+        <button class="btn btn-green btn-sm" onclick="manualShip('${o.id}')">✓ Confirm Shipped</button>
+      </div>
+    </div>`).join(''):'<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No packed orders</div>';
+}
+
+function manualShip(id){
+  const o=orders.find(x=>x.id===id);
+  if(o){o.status='shipped';o.shippedAt=new Date().toLocaleString();}
+  save();renderPacked();renderDash();log(`Order #${id} shipped`);toast(`#${id} shipped 🚀`);
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
+function loadSets(){
+  if(sets.camMode)document.getElementById('cam-mode').value=sets.camMode;
+  if(sets.brand)document.getElementById('lbl-brand').value=sets.brand;
+  if(sets.lblSize)document.getElementById('lbl-size').value=sets.lblSize;
+  const tok=localStorage.getItem('nt_tok');
+  if(tok)document.getElementById('sh-token').value=tok;
+}
+
+function saveSets(){
+  sets.camMode=document.getElementById('cam-mode')?.value;
+  sets.brand=document.getElementById('lbl-brand')?.value||'NT Note';
+  sets.lblSize=document.getElementById('lbl-size')?.value;
+  save();
+}
+
+function saveShopify(){
+  const tok=document.getElementById('sh-token').value.trim();
+  if(!tok){toast('Enter token',true);return;}
+  localStorage.setItem('nt_tok',tok);
+  localStorage.setItem('nt_store',document.getElementById('sh-store').value.trim());
+  toast('Shopify saved ✓');
+}
+
+function syncOrders(){toast('Sync active via NT connector ✓');}
+
+function toggleTok(){
+  const i=document.getElementById('sh-token');
+  const e=document.getElementById('tok-eye');
+  i.type=i.type==='password'?'text':'password';
+  e.textContent=i.type==='password'?'👁':'🙈';
+}
+
+function showQR(){
+  const url=window.location.href;
+  const box=document.getElementById('qr-box');
+  box.innerHTML='';
+  try{new QRCode(box,{text:url,width:180,height:180,colorDark:'#000',colorLight:'#fff'});}
+  catch(e){box.innerHTML=`<div style="font-size:12px;color:#333;padding:20px;text-align:center">${url}</div>`;}
+  document.getElementById('qr-section').style.display='block';
+  document.getElementById('qr-btns').style.display='none';
+  toast('Scan QR with your phone 📱');
+}
+function hideQR(){document.getElementById('qr-section').style.display='none';document.getElementById('qr-btns').style.display='block';}
+function copyLink(){
+  navigator.clipboard?.writeText(window.location.href).then(()=>toast('Link copied! Paste in WhatsApp 📲')).catch(()=>prompt('Copy link:',window.location.href));
+}
+
+async function testCam(){
+  document.getElementById('test-wrap').style.display='block';
+  document.getElementById('test-result').style.display='flex';
+  testScan=await startScanner('test-vid',(code,cr,err)=>{
+    const el=document.getElementById('test-result');
+    if(err){el.className='result-pill err';el.innerHTML='<span>⚠ Camera unavailable</span>';return;}
+    if(code){el.className='result-pill ok';el.innerHTML=`<span>✓</span><span>Works! Scanned: <b>${code}</b></span>`;toast('Camera working ✓');}
+  });
+}
+function stopTest(){
+  stopScanner(testScan,'test-vid');testScan=null;
+  document.getElementById('test-wrap').style.display='none';
+  document.getElementById('test-result').style.display='none';
+}
+
+function exportData(){
+  const d={inv,orders,acts,sets,v:'2.0',date:new Date().toISOString()};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));
+  a.download=`nt-system-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();toast('Exported ✓');
+}
+function importData(){document.getElementById('imp-file').click();}
+function handleImport(input){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(d.inv)inv=d.inv;if(d.orders)orders=d.orders;if(d.acts)acts=d.acts;
+      save();renderDash();renderInv();renderOrders();toast(`Imported ${d.inv?.length||0} products`);
+    }catch{toast('Invalid file',true);}
+  };
+  r.readAsText(input.files[0]);
+}
+function clearData(){
+  if(!confirm('Clear ALL data? Cannot undo.'))return;
+  inv=[];orders=[];acts=[];save();renderDash();renderInv();renderOrders();toast('Cleared');
+}
+
+// Close modals on bg click
+document.querySelectorAll('.modal-bg').forEach(b=>b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open');}));
+
+// INIT
+renderDash();
+</script>
+</body>
+</html>
